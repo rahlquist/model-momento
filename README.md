@@ -73,6 +73,8 @@ SQLite DB lives in `model_momento.db` (created on first run from
 - Cross-table search (models, notes, runs, evals)
 - **Export MD** — downloads a formatted markdown card: download link,
   metadata table, evals, runs, notes
+- **Export Card** — PNG version of the card with a QR code linking to the
+  HF page; courtesy credit line in the bottom-left
 - **Copy link** — small 📋 button next to the link in the Metadata card;
   copies the HF URL with press animation feedback
 
@@ -92,6 +94,7 @@ Base URL: `http://127.0.0.1:8765`
 | GET | `/api/runs?model_id=` | List runs with metrics |
 | POST | `/api/evals` | Claimed score: `{model_id, benchmark_name, score, variant?, source?}` |
 | GET | `/api/search?q=` | Cross-table search (models, notes, runs, evals) |
+| GET | `/api/models/{id}/card.png` | Rendered PNG card with QR to the HF page |
 | POST | `/api/import` | `{repo_ids: ["owner/name", ...]}` from HF |
 
 `POST /api/runs` body: `{model_id, host?, backend?, prompt_template?,
