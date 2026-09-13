@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>model-momento</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin:0; font: 14px/1.5 system-ui, sans-serif; background:#0f1115; color:#e2e6ee; }
+  header { display:flex; align-items:center; gap:16px; padding:12px 20px; background:#161a22; border-bottom:1px solid #262c38; }
+  header h1 { font-size:16px; margin:0; letter-spacing:.5px; }
+  header input { flex:1; max-width:420px; background:#0f1115; border:1px solid #2c3444; color:#e2e6ee; border-radius:6px; padding:7px 10px; }
+  header .hf { margin-left:auto; display:flex; gap:8px; }
+  header .hf input { max-width:280px; }
+  button { background:#2f6fed; color:#fff; border:0; border-radius:6px; padding:7px 14px; cursor:pointer; font:inherit; }
+  button.secondary { background:#2c3444; }
+  button.danger { background:#a33; }
+  main { display:flex; height:calc(100vh - 55px); }
+  #list { width:340px; overflow-y:auto; border-right:1px solid #262c38; }
+  .item { padding:10px 16px; border-bottom:1px solid #1c222d; cursor:pointer; }
+  .item:hover, .item.active { background:#1c222d; }
+  .item .rid { font-weight:600; }
+  .item .meta { color:#8b93a3; font-size:12px; }
+  #detail { flex:1; overflow-y:auto; padding:24px; }
+  .empty { color:#8b93a3; padding:40px; text-align:center; }
+  h2 { margin-top:0; }
+  form { display:grid; grid-template-columns:repeat(2, 1fr); gap:12px 20px; max-width:760px; }
+  form label { display:flex; flex-direction:column; gap:4px; font-size:12px; color:#aeb6c4; }
+  form label.full { grid-column: span 2; }
+  input, textarea, select { background:#0f1115; border:1px solid #2c3444; color:#e2e6ee; border-radius:6px; padding:7px 10px; font:inherit; }
+  textarea { min-height:70px; resize:vertical; }
+  .actions { display:flex; gap:10px; margin-top:16px; }
+  .card { background:#161a22; border:1px solid #262c38; border-radius:8px; padding:14px 16px; margin:12px 0; max-width:760px; }
+  .card h3 { margin:0 0 8px; font-size:13px; color:#aeb6c4; text-transform:uppercase; letter-spacing:.5px; }
+  .row { display:flex; justify-content:space-between; gap:10px; padding:3px 0; font-size:13px; }
+  .row .k { color:#8b93a3; }
+  .muted { color:#8b93a3; }
+  .tag { display:inline-block; background:#222a38; border-radius:4px; padding:1px 7px; margin:2px 2px; font-size:12px; }
+  #result { max-width:760px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>model-momento</h1>
+  <input id="q" placeholder="Search models, notes, runs, evals…" onkeydown="if(event.key==='Enter')search()">
+  <button class="secondary" onclick="search()">Search</button>
+  <div class="hf">
+    <input id="hfRepo" placeholder="owner/name (HF import)">
+    <button onclick="importHF()">Import</button>
+  </div>
+  <button onclick="newModel()">+ New</button>
+</header>
+<main>
+  <nav id="list"><div class="empty">Loading…</div></nav>
+  <section id="detail"><div class="empty">Select a model or press + New</div></section>
+</main>
+
+<script>
+const api = (p, opt) => fetch(p, opt && {headers:{'Content-Type':'application/json'}, ...opt}).then(r => {
+  if (!r.ok) return r.json().then(e => Promise.reject(new Error(e.detail || r.status)));
+  return r.status === 204 ? null : r.json();
+});
+let models = [], currentId = null;
+
+async function loadList() {
+  models = await api('/api/models?limit=500');
+  const el = document.getElementById('list');
+  el.innerHTML = models.length ? models.map(m => `
+    <div class="item" data-id="${m.model_id}" onclick="openModel(${m.model_id})">
+      <div class="rid">${m.repo_id}</div>
+      <div class="meta">${m.pipeline_tag || '—'} · ${m.architecture || '?'} · ${fmtParams(m.params_count)}</div>
+    </div>`).join('') : '<div class="empty">No models yet. Import from HF or press + New.</div>';
+  const act = el.querySelector(`[data-id="${currentId}"]`); if (act) act.classList.add('active');
+}
+const fmtParams = n => n ? (n >= 1e9 ? (n/1e9).toFixed(1)+'B' : (n/1e6).toFixed(0)+'M') : '?';
+
+async function openModel(id) {
+  currentId = id;
+  const m = await api('/api/models/' + id);
+  document.querySelectorAll('.item').forEach(e => e.classList.toggle('active', +e.dataset.id === id));
+  document.getElementById('detail').innerHTML = `
+    <h2>${m.repo_id} <button class="secondary" onclick="editForm()">Edit</button>
+        <button class="danger" onclick="delModel(${m.model_id})">Delete</button></h2>
+    <div>${(m.tags||[]).map(t=>`<span class="tag">${t}</span>`).join('')}</div>
+    <div class="card"><h3>Metadata</h3>
+      <div class="row"><span class="k">pipeline</span><span>${m.pipeline_tag||'—'}</span></div>
+      <div class="row"><span class="k">library</span><span>${m.library_name||'—'}</span></div>
+      <div class="row"><span class="k">license</span><span>${m.license||'—'}</span></div>
+      <div class="row"><span class="k">architecture</span><span>${m.architecture||'—'}</span></div>
+      <div class="row"><span class="k">params</span><span>${fmtParams(m.params_count)}</span></div>
+      <div class="row"><span class="k">quantization</span><span>${m.quantization||'—'}</span></div>
+      <div class="row"><span class="k">context length</span><span>${m.context_length||'—'}</span></div>
+      <div class="row"><span class="k">downloads / likes</span><span>${m.downloads??'—'} / ${m.likes??'—'}</span></div>
+      <div class="row"><span class="k">sha</span><span>${(m.sha||'—').slice(0,12)}</span></div>
+      <div class="row"><span class="k">link</span><span><a href="${m.hf_url||'#'}" target="_blank">${m.hf_url||'—'}</a></span></div>
+    </div>
+    ${(m.evals||[]).length ? `<div class="card"><h3>Claimed evals</h3>${m.evals.map(e=>`<div class="row"><span class="k">${e.benchmark_name}${e.variant?' ('+e.variant+')':''} [${e.source||''}]</span><span>${e.score??'—'}</span></div>`).join('')}</div>` : ''}
+    ${(m.runs||[]).length ? `<div class="card"><h3>My test runs</h3>${m.runs.map(r=>`<div class="row"><span class="k">${r.run_date?.slice(0,16)} · ${r.host||'?'} · ${r.backend||'?'}</span><span>${r.verdict||'—'}</span></div>`).join('')}</div>` : ''}
+    ${(m.note_list||[]).length ? `<div class="card"><h3>Notes</h3>${m.note_list.map(n=>`<div class="row"><span class="k">${n.note_date?.slice(0,16)} ${n.category?'· '+n.category:''}</span><span>${esc(n.note)}</span></div>`).join('')}</div>` : ''}
+    <div class="card"><h3>Add note</h3>
+      <form onsubmit="addNote(event, ${m.model_id})">
+        <label>Category<input name="category" placeholder="quality / refusal / bug / …"></label>
+        <label class="full">Note<textarea name="note" required></textarea></label>
+        <div class="actions"><button>Add note</button></div>
+      </form></div>
+    <div class="card"><h3>Add benchmark run</h3>
+      <form onsubmit="addRun(event, ${m.model_id})">
+        <label>Host<input name="host" placeholder="Wimpy"></label>
+        <label>Backend<input name="backend" placeholder="llama.cpp b1234"></label>
+        <label>Benchmark suite<input name="benchmark_suite" placeholder="lm-eval MMLU"></label>
+        <label>Verdict<select name="verdict"><option></option><option>keep</option><option>reject</option><option>investigate</option></select></label>
+        <label>Metric name<input name="metric_name" placeholder="t/s gen"></label>
+        <label>Metric value<input name="metric_value" type="number" step="any"></label>
+        <label>Metric unit<input name="metric_unit" placeholder="tok/s"></label>
+        <label>Summary<textarea name="summary" style="min-height:44px"></textarea></label>
+        <label class="full">Comment (stored as note)<textarea name="note" style="min-height:44px"></textarea></label>
+        <div class="actions"><button>Record run</button></div>
+      </form></div>`;
+}
+const esc = s => (s||'').replace(/</g,'&lt;');
+
+function fields(f) { const o = {}; new FormData(f).forEach((v,k) => o[k] = v); return o; }
+
+async function addNote(ev, mid) {
+  ev.preventDefault(); const d = fields(ev.target);
+  await api('/api/notes', {method:'POST', body: JSON.stringify({model_id: mid, category: d.category || null, note: d.note})});
+  openModel(mid);
+}
+async function addRun(ev, mid) {
+  ev.preventDefault(); const d = fields(ev.target);
+  const body = {model_id: mid, host: d.host||null, backend: d.backend||null, benchmark_suite: d.benchmark_suite||null,
+    verdict: d.verdict||null, summary: d.summary||null, note: d.note||null,
+    metrics: d.metric_name ? [{metric_name: d.metric_name, value: parseFloat(d.metric_value), unit: d.metric_unit||null}] : []};
+  await api('/api/runs', {method:'POST', body: JSON.stringify(body)});
+  openModel(mid);
+}
+
+const FIELDS = [['repo_id','repo id (owner/name)',1],['pipeline_tag','pipeline tag'],['library_name','library'],['license','license'],['model_type','model type'],['architecture','architecture'],['params_count','params count'],['quantization','quantization'],['context_length','context length'],['downloads','downloads'],['likes','likes'],['hf_url','HF url',1],['sha','sha',1]];
+function modelForm(m = {}) {
+  const intFields = ['params_count','context_length','downloads','likes'];
+  document.getElementById('detail').innerHTML = `<h2>${m.model_id ? 'Edit ' + m.repo_id : 'New model'}</h2>
+    <form onsubmit="saveModel(event, ${m.model_id || 'null'})">
+      ${FIELDS.map(([k,label,full]) => `<label class="${full?'full':''}">${label}<input name="${k}" value="${m[k] ?? ''}"></label>`).join('')}
+      <label class="full">Tags (comma separated)<input name="tags" value="${(m.tags||[]).join(', ')}"></label>
+      <div class="actions"><button>Save</button><button type="button" class="secondary" onclick="${m.model_id?`openModel(${m.model_id})`:'loadList()'}">Cancel</button></div>
+    </form>`;
+}
+function newModel(){ modelForm(); }
+async function editForm(){ modelForm(await api('/api/models/' + currentId)); }
+async function saveModel(ev, id) {
+  ev.preventDefault(); const d = fields(ev.target);
+  intFields = ['params_count','context_length','downloads','likes'];
+  intFields.forEach(k => d[k] = d[k] === '' ? null : parseInt(d[k]));
+  d.tags = (d.tags||'').split(',').map(s=>s.trim()).filter(Boolean);
+  if (id) await api('/api/models/'+id, {method:'PUT', body: JSON.stringify(d)});
+  else await api('/api/models', {method:'POST', body: JSON.stringify(d)});
+  currentId = null; await loadList();
+  if (id) openModel(id);
+}
+async function delModel(id) {
+  if (!confirm('Delete this model and all its notes, runs, and metrics?')) return;
+  await api('/api/models/'+id, {method:'DELETE'});
+  currentId = null; await loadList();
+  document.getElementById('detail').innerHTML = '<div class="empty">Deleted.</div>';
+}
+async function importHF() {
+  const rid = document.getElementById('hfRepo').value.trim();
+  if (!rid) return;
+  const r = await api('/api/import', {method:'POST', body: JSON.stringify({repo_ids:[rid]})});
+  if (!r[0].ok) return alert('Import failed: ' + r[0].error);
+  await loadList(); openModel(r[0].model_id);
+}
+async function search() {
+  const q = document.getElementById('q').value.trim();
+  if (!q) return loadList();
+  const r = await api('/api/search?q=' + encodeURIComponent(q));
+  document.getElementById('detail').innerHTML = `<h2>Results for “${esc(q)}”</h2><div id="result">
+    ${r.models.map(m=>`<div class="row"><span class="k">model</span><span><a href="#" onclick="openModel(${m.model_id});return false">${m.repo_id}</a> · ${m.architecture||''}</span></div>`).join('')}
+    ${r.evals.map(e=>`<div class="row"><span class="k">eval</span><span>${e.repo_id} · ${e.benchmark_name}=${e.score} (${e.variant||''}, ${e.source||''})</span></div>`).join('')}
+    ${r.runs.map(x=>`<div class="row"><span class="k">run</span><span>${x.repo_id} · ${x.benchmark_suite||''} · ${x.verdict||''}</span></div>`).join('')}
+    ${r.notes.map(n=>`<div class="row"><span class="k">note</span><span>${n.repo_id} · [${n.category||''}] ${esc(n.note).slice(0,120)}</span></div>`).join('')}
+  </div>`;
+}
+loadList();
+</script>
+</body>
+</html>
