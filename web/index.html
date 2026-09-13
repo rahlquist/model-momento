@@ -80,6 +80,7 @@ async function openModel(id) {
   document.querySelectorAll('.item').forEach(e => e.classList.toggle('active', +e.dataset.id === id));
   document.getElementById('detail').innerHTML = `
     <h2>${m.repo_id} <button class="secondary" onclick="editForm()">Edit</button>
+        <button class="secondary" onclick="exportMD(${m.model_id})">Export MD</button>
         <button class="danger" onclick="delModel(${m.model_id})">Delete</button></h2>
     <div>${(m.tags||[]).map(t=>`<span class="tag">${t}</span>`).join('')}</div>
     <div class="card"><h3>Metadata</h3>
@@ -118,6 +119,57 @@ async function openModel(id) {
       </form></div>`;
 }
 const esc = s => (s||'').replace(/</g,'&lt;');
+
+async function exportMD(id) {
+  const m = await api('/api/models/' + id);
+  const L = [];
+  L.push(`# ${m.repo_id}`);
+  L.push('');
+  L.push(`**Download:** ${m.hf_url || 'https://huggingface.co/' + m.repo_id}`);
+  if (m.sha) L.push(`**Revision:** \`${m.sha}\``);
+  L.push('');
+  L.push('| Field | Value |');
+  L.push('|---|---|');
+  const row = (k,v) => { if (v !== null && v !== undefined && v !== '') L.push(`| ${k} | ${v} |`); };
+  row('Pipeline', m.pipeline_tag);
+  row('Library', m.library_name);
+  row('License', m.license);
+  row('Architecture', m.architecture);
+  row('Params', m.params_count ? fmtParams(m.params_count) + ' (' + m.params_count + ')' : null);
+  row('Quantization', m.quantization);
+  row('Context length', m.context_length);
+  row('Downloads / likes', (m.downloads ?? '') + (m.downloads!=null ? ' / ' + (m.likes ?? '—') : ''));
+  row('HF created', m.hf_created_at);
+  row('Last modified', m.last_modified);
+  if ((m.tags||[]).length) { L.push(`| Tags | ${m.tags.map(t=>`\`${t}\``).join(', ')} |`); }
+  if ((m.languages||[]).length) L.push(`| Languages | ${m.languages.join(', ')} |`);
+  if ((m.datasets||[]).length) L.push(`| Datasets | ${m.datasets.map(d=>`\`${d}\``).join(', ')} |`);
+  if ((m.bases||[]).length) L.push(`| Base model(s) | ${m.bases.map(b=>`\`${b.base_repo_id}\` (${b.relation})`).join(', ')} |`);
+  if ((m.evals||[]).length) {
+    L.push('', '## Claimed evals', '', '| Benchmark | Variant | Score | Source |', '|---|---|---|---|');
+    m.evals.forEach(e => L.push(`| ${e.benchmark_name} | ${e.variant||'—'} | ${e.score??'—'} | ${e.source||'—'} |`));
+  }
+  if ((m.runs||[]).length) {
+    L.push('', '## Test runs', '');
+    m.runs.forEach(r => {
+      L.push(`### ${r.run_date} — ${r.host||'?'} · ${r.backend||'?'} — verdict: **${r.verdict||'—'}**`);
+      if (r.summary) L.push('', r.summary);
+      (r.metrics||[]).forEach(x => L.push(`- **${x.metric_name}**: ${x.value} ${x.unit||''}`));
+      L.push('');
+    });
+  }
+  if ((m.note_list||[]).length) {
+    L.push('', '## Notes', '');
+    m.note_list.forEach(n => L.push(`- **${n.note_date}${n.category ? ' · '+n.category : ''}** — ${n.note}`));
+  }
+  const md = L.join('\n') + '\n';
+  const blob = new Blob([md], {type:'text/markdown'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = m.repo_id.replace('/','_') + '.md';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
 
 function fields(f) { const o = {}; new FormData(f).forEach((v,k) => o[k] = v); return o; }
 
