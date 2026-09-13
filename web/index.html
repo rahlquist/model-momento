@@ -88,6 +88,7 @@ async function openModel(id) {
   document.getElementById('detail').innerHTML = `
     <h2>${m.repo_id} <button class="secondary" onclick="editForm()">Edit</button>
         <button class="secondary" onclick="exportMD(${m.model_id})">Export MD</button>
+        <button class="secondary" onclick="exportCard(${m.model_id})">Export Card</button>
         <button class="danger" onclick="delModel(${m.model_id})">Delete</button></h2>
     <div>${(m.tags||[]).map(t=>`<span class="tag">${t}</span>`).join('')}</div>
     <div class="card"><h3>Metadata</h3>
@@ -187,6 +188,13 @@ async function exportMD(id) {
 }
 
 function fields(f) { const o = {}; new FormData(f).forEach((v,k) => o[k] = v); return o; }
+
+function exportCard(id) {
+  const a = document.createElement('a');
+  a.href = '/api/models/' + id + '/card.png';
+  a.download = '';
+  a.click();
+}
 
 async function addNote(ev, mid) {
   ev.preventDefault(); const d = fields(ev.target);

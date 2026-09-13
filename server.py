@@ -4,7 +4,7 @@ import sqlite3
 from pathlib import Path
 from typing import Any, Optional
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -310,6 +310,137 @@ def import_models(payload: ImportIn):
             out.append({"repo_id": repo_id, "ok": False, "error": str(e)})
     c.close()
     return out
+
+
+@app.get("/api/models/{model_id}/card.png")
+def model_card_png(model_id: int):
+    """Render a branded markdown-style card as a PNG with a QR code to the HF page."""
+    import io
+    import qrcode
+    from PIL import Image, ImageDraw, ImageFont
+    from urllib.request import urlopen
+
+    c = con()
+    m = c.execute("SELECT * FROM model WHERE model_id=?", (model_id,)).fetchone()
+    if not m:
+        c.close()
+        raise HTTPException(404, "model not found")
+    m = dict(m)
+    m["tags"] = [r["tag"] for r in c.execute("SELECT tag FROM model_tag WHERE model_id=?", (model_id,))]
+    m["evals"] = rows(c, "SELECT benchmark_name, score, variant, source FROM model_eval WHERE model_id=?", (model_id,))
+    m["runs"] = rows(c, "SELECT run_date, host, backend, verdict FROM test_run WHERE model_id=?", (model_id,))
+    m["note_list"] = rows(c, "SELECT note, note_date, category FROM model_note WHERE model_id=? ORDER BY note_date DESC LIMIT 5", (model_id,))
+    c.close()
+
+    url = m["hf_url"] or f"https://huggingface.co/{m['repo_id']}"
+    W, PAD = 1000, 40
+    BG, FG, MUTED, ACCENT = "#0f1115", "#e2e6ee", "#8b93a3", "#2f6fed"
+    img = Image.new("RGB", (W, 1400), BG)
+    draw = ImageDraw.Draw(img)
+    y = PAD
+
+    def font(size, bold=False):
+        for p in ("/usr/share/fonts/truetype/dejavu/DejaVuSans%s.ttf" % ("-Bold" if bold else ""),
+                  "/usr/share/fonts/TTF/DejaVuSans%s.ttf" % ("-Bold" if bold else "")):
+            try:
+                return ImageFont.truetype(p, size)
+            except OSError:
+                continue
+        return ImageFont.load_default(size)
+
+    def wrap(text, f, maxw):
+        lines = []
+        for para in text.split("\n"):
+            line = ""
+            for w in para.split():
+                t = (line + " " + w).strip()
+                if draw.textlength(t, font=f) <= maxw:
+                    line = t
+                else:
+                    if line: lines.append(line)
+                    line = w
+            lines.append(line)
+        return lines
+
+    def text(s, size, color=FG, bold=False, dy=0):
+        nonlocal y
+        f = font(size, bold)
+        for ln in wrap(s, f, W - 2*PAD - 320):
+            draw.text((PAD, y), ln, font=f, fill=color)
+            y += size + 8
+        y += dy
+
+    f_title = font(44, True)
+    TITLE_MAX = W - 2*PAD - 320      # keep clear of the QR block
+    size = 44
+    while size > 18 and draw.textlength(m["repo_id"], font=font(size, True)) > TITLE_MAX:
+        size -= 2
+    draw.text((PAD, y), m["repo_id"], font=font(size, True), fill=ACCENT)
+    y += size + 14
+
+    def fmt_params(n):
+        if not n: return "?"
+        return f"{n/1e9:.1f}B" if n >= 1e9 else f"{n/1e6:.0f}M"
+
+    meta = [
+        ("Pipeline", m["pipeline_tag"]), ("Library", m["library_name"]),
+        ("License", m["license"]), ("Architecture", m["architecture"]),
+        ("Params", fmt_params(m["params_count"])), ("Quantization", m["quantization"]),
+        ("Context", m["context_length"]), ("Downloads", m["downloads"]),
+    ]
+    f_lbl, f_val = font(22, True), font(22)
+    for k, v in meta:
+        if v in (None, ""): continue
+        draw.text((PAD, y), f"{k}:", font=f_lbl, fill=MUTED)
+        draw.text((PAD + 170, y), str(v), font=f_val, fill=FG)
+        y += 32
+    if m["tags"]:
+        y += 8
+        for ln in wrap("Tags: " + ", ".join(m["tags"][:8]), f_val, W - 2*PAD - 320):
+            draw.text((PAD, y), ln, font=f_val, fill=MUTED)
+            y += 30
+    y += 14
+
+    if m["evals"]:
+        text("Claimed evals", 26, ACCENT, True)
+        for e in m["evals"][:6]:
+            text(f"• {e['benchmark_name']}" + (f" ({e['variant']})" if e["variant"] else "") + f": {e['score']}", 22, FG)
+        y += 8
+    if m["runs"]:
+        text("Test runs", 26, ACCENT, True)
+        for r in m["runs"][:4]:
+            text(f"• {str(r['run_date'])[:16]} {r['host'] or ''} — {r['verdict'] or '—'}", 22, FG)
+        y += 8
+    if m["note_list"]:
+        text("Notes", 26, ACCENT, True)
+        for n in m["note_list"]:
+            for ln in wrap(f"• {n['note']}", f_val, W - 2*PAD - 320):
+                draw.text((PAD, y), ln, font=f_val, fill=FG)
+                y += 30
+            y += 4
+
+    # QR code, top-right
+    qr = qrcode.QRCode(box_size=6, border=1)
+    qr.add_data(url)
+    qr.make(fit=True)
+    qimg = qr.make_image(fill_color=FG, back_color=BG).convert("RGB")
+    QS = 260
+    qimg = qimg.resize((QS, QS), Image.NEAREST)
+    img.paste(qimg, (W - PAD - QS, PAD + 10))
+    f_qr = font(16)
+    for i, ln in enumerate(wrap("Scan to open", f_qr, QS)):
+        draw.text((W - PAD - QS, PAD + QS + 18 + i*20), ln, font=f_qr, fill=MUTED)
+
+    # courtesy line, bottom-left, small
+    f_c = font(16)
+    y = max(y + 24, 70)          # ensure room below content
+    draw.text((PAD, y), "card courtesy of @sovthpaw creator of TurboFit", font=f_c, fill=MUTED)
+    y += 30
+
+    out = img.crop((0, 0, W, min(img.height, y)))
+    buf = io.BytesIO()
+    out.save(buf, "PNG")
+    return Response(content=buf.getvalue(), media_type="image/png")
 
 
 # ---------- SPA ----------
