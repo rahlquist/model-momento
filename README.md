@@ -100,6 +100,18 @@ ctx_size?, benchmark_suite?, verdict?, summary?, metrics:
 benchmark-category model_note. `verdict` must be `keep`, `reject`, or
 `investigate`.
 
+## Schema
+
+10 normalized tables with `model` as the hub:
+
+- Children (1:N via `model_id`): `model_tag`, `model_language`,
+  `model_dataset`, `model_base`, `model_eval`, `model_note`, `test_run`
+- `test_run` → `test_metric` (1:N via `run_id`) — your measured numbers
+- `model_local` (1:0..1 — `model_id` is both PK and FK): local copies,
+  sha256, serving backend, host, status
+
+![Entity-Relationship Diagram](docs/erd.png)
+
 ## Design notes
 
 - `repo_id` (`owner/name`) is the exact natural key; duplicates are 409.
