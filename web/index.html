@@ -37,6 +37,13 @@
   .muted { color:#8b93a3; }
   .tag { display:inline-block; background:#222a38; border-radius:4px; padding:1px 7px; margin:2px 2px; font-size:12px; }
   #result { max-width:760px; }
+  .hf-line { display:flex; align-items:center; gap:6px; margin:4px 0 12px; }
+  .hf-line a { color:#6ea8ff; }
+  .copy-btn { background:#2c3444; border:1px solid #3a4456; border-radius:5px;
+              padding:2px 7px; font-size:12px; line-height:1; cursor:pointer;
+              transition:transform .08s, background .15s; }
+  .copy-btn:active { transform:scale(.88); background:#2f6fed; }
+  .copy-btn.copied { background:#2f6fed; border-color:#2f6fed; }
 </style>
 </head>
 <body>
@@ -82,6 +89,8 @@ async function openModel(id) {
     <h2>${m.repo_id} <button class="secondary" onclick="editForm()">Edit</button>
         <button class="secondary" onclick="exportMD(${m.model_id})">Export MD</button>
         <button class="danger" onclick="delModel(${m.model_id})">Delete</button></h2>
+    <div class="hf-line"><span class="k">Link:</span> <a href="${m.hf_url||'#'}" target="_blank">${m.hf_url||'—'}</a>
+        <button class="copy-btn" title="Copy link" onclick="copyLink(this, '${(m.hf_url||'').replace(/'/g,"\\'")}')">&#128203;</button></div>
     <div>${(m.tags||[]).map(t=>`<span class="tag">${t}</span>`).join('')}</div>
     <div class="card"><h3>Metadata</h3>
       <div class="row"><span class="k">pipeline</span><span>${m.pipeline_tag||'—'}</span></div>
@@ -119,6 +128,13 @@ async function openModel(id) {
       </form></div>`;
 }
 const esc = s => (s||'').replace(/</g,'&lt;');
+
+async function copyLink(btn, url) {
+  try { await navigator.clipboard.writeText(url); }
+  catch { const t = document.createElement('textarea'); t.value = url; document.body.appendChild(t); t.select(); document.execCommand('copy'); t.remove(); }
+  btn.classList.add('copied');
+  setTimeout(() => btn.classList.remove('copied'), 800);
+}
 
 async function exportMD(id) {
   const m = await api('/api/models/' + id);
