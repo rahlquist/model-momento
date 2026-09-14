@@ -110,9 +110,9 @@ async function openModel(id) {
         <button class="copy-btn" title="Copy link" onclick="copyLink(this, '${(m.hf_url||'').replace(/'/g,"\\'")}')">&#128203;</button></span></div>
     </div>
     <div class="card"><h3>Perfect for (VRAM)</h3>
-      <div class="pf-grid">${VRAMS.map(v => {
-        const on = m.perfect_for && m.perfect_for[v.key];
-        return `<label class="pf ${on?'on':''}"><input type="checkbox" name="${v.key}" ${on?'checked':''} onchange="setPF(${m.model_id},'${v.key}',this.checked)"><span>${v.label}</span></label>`;
+      <div class="pf-grid">${VRAMS.map(([vkey, vlabel]) => {
+        const on = m.perfect_for && m.perfect_for[vkey];
+        return `<label class="pf ${on?'on':''}"><input type="checkbox" name="${vkey}" ${on?'checked':''} onchange="setPF(${m.model_id},'${vkey}',this.checked)"><span>${vlabel}</span></label>`;
       }).join('')}</div>
     </div>
     ${(m.evals||[]).length ? `<div class="card"><h3>Claimed evals</h3>${m.evals.map(e=>`<div class="row"><span class="k">${e.benchmark_name}${e.variant?' ('+e.variant+')':''} [${e.source||''}]</span><span>${e.score??'—'}</span></div>`).join('')}</div>` : ''}
