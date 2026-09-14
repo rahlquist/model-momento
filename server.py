@@ -332,6 +332,8 @@ def model_card_png(model_id: int):
     m["evals"] = rows(c, "SELECT benchmark_name, score, variant, source FROM model_eval WHERE model_id=?", (model_id,))
     m["runs"] = rows(c, "SELECT run_date, host, backend, verdict FROM test_run WHERE model_id=?", (model_id,))
     m["note_list"] = rows(c, "SELECT note, note_date, category FROM model_note WHERE model_id=? ORDER BY note_date DESC LIMIT 5", (model_id,))
+    pf = c.execute("SELECT * FROM perfect_for WHERE model_id=?", (model_id,)).fetchone()
+    m["perfect_for"] = dict(pf) if pf else None
     c.close()
 
     url = m["hf_url"] or f"https://huggingface.co/{m['repo_id']}"
@@ -440,6 +442,16 @@ def model_card_png(model_id: int):
         for ln in wrap("Tags: " + ", ".join(m["tags"][:8]), f_val, W - 2*PAD - 320):
             draw.text((PAD, y), ln, font=f_val, fill=MUTED)
             y += 30
+    pf = m.get("perfect_for")
+    if pf:
+        labels = [("vram_256gb","256GB"),("vram_128gb","128GB"),("vram_64gb","64GB"),
+                  ("vram_32gb","32GB"),("vram_22gb","22GB"),("vram_20gb","20GB"),
+                  ("vram_16gb","16GB"),("vram_12gb","12GB"),("vram_8gb","8GB"),("vram_4gb","4GB")]
+        pf_text = "Everything" if pf.get("everything") else \
+            ", ".join(lbl for k, lbl in labels if pf.get(k)) or "—"
+        draw.text((PAD, y), "Perfect for:", font=f_lbl, fill=MUTED)
+        draw.text((PAD + 170, y), pf_text, font=f_val, fill=FG)
+        y += 32
     y += 14
 
     if m["evals"]:

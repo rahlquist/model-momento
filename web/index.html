@@ -162,8 +162,12 @@ async function exportMD(id) {
   const L = [];
   L.push(`# ${m.repo_id}`);
   L.push('');
-  L.push(`**Download:** ${m.hf_url || 'https://huggingface.co/' + m.repo_id}`);
+  L.push(`**Link:** ${m.hf_url || 'https://huggingface.co/' + m.repo_id}`);
   if (m.sha) L.push(`**Revision:** \`${m.sha}\``);
+  const pfOn = (m.perfect_for ? ['vram_256gb','vram_128gb','vram_64gb','vram_32gb','vram_22gb','vram_20gb','vram_16gb','vram_12gb','vram_8gb','vram_4gb'].filter(k => m.perfect_for[k]).length : 0);
+  const pfText = m.perfect_for && m.perfect_for.everything ? 'Everything'
+    : (pfOn ? ['256GB','128GB','64GB','32GB','22GB','20GB','16GB','12GB','8GB','4GB'].filter((_, i) => m.perfect_for[['vram_256gb','vram_128gb','vram_64gb','vram_32gb','vram_22gb','vram_20gb','vram_16gb','vram_12gb','vram_8gb','vram_4gb'][i]]).join(', ') : '—');
+  L.push(`**Perfect for:** ${pfText}`);
   L.push('');
   L.push('| Field | Value |');
   L.push('|---|---|');
