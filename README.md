@@ -77,6 +77,11 @@ SQLite DB lives in `model_momento.db` (created on first run from
   metadata table, evals, runs, notes
 - **Export Card** — PNG version of the card with a QR code linking to the
   HF page; courtesy credit line in the bottom-left
+
+Example card for `Qwen/Qwen2.5-7B-Instruct`:
+
+![Example model card](docs/example-card.png)
+
 - **Copy link** — small 📋 button next to the link in the Metadata card;
   copies the HF URL with press animation feedback
 
