@@ -179,7 +179,6 @@ async function exportMD(id) {
   row('Params', m.params_count ? fmtParams(m.params_count) + ' (' + m.params_count + ')' : null);
   row('Quantization', m.quantization);
   row('Context length', m.context_length);
-  row('Downloads / likes', (m.downloads ?? '') + (m.downloads!=null ? ' / ' + (m.likes ?? '—') : ''));
   row('HF created', m.hf_created_at);
   row('Last modified', m.last_modified);
   if ((m.tags||[]).length) { L.push(`| Tags | ${m.tags.map(t=>`\`${t}\``).join(', ')} |`); }

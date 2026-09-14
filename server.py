@@ -429,7 +429,7 @@ def model_card_png(model_id: int):
         ("Pipeline", m["pipeline_tag"]), ("Library", m["library_name"]),
         ("License", m["license"]), ("Architecture", m["architecture"]),
         ("Params", fmt_params(m["params_count"])), ("Quantization", m["quantization"]),
-        ("Context", m["context_length"]), ("Downloads", m["downloads"]),
+        ("Context", m["context_length"]),
     ]
     f_lbl, f_val = font(22, True), font(22)
     for k, v in meta:
