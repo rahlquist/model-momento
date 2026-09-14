@@ -317,7 +317,7 @@ def model_card_png(model_id: int):
     """Render a branded markdown-style card as a PNG with a QR code to the HF page."""
     import io
     import qrcode
-    from PIL import Image, ImageDraw, ImageFont
+    from PIL import Image, ImageDraw, ImageFont, ImageFilter
     from urllib.request import urlopen
 
     c = con()
@@ -333,9 +333,48 @@ def model_card_png(model_id: int):
     c.close()
 
     url = m["hf_url"] or f"https://huggingface.co/{m['repo_id']}"
-    W, PAD = 1000, 40
-    BG, FG, MUTED, ACCENT = "#0f1115", "#e2e6ee", "#8b93a3", "#2f6fed"
-    img = Image.new("RGB", (W, 1400), BG)
+    W, PAD = 1300, 52               # 30% larger canvas than v0.2.0 (1000/40)
+    # fonts/QR stay at their original pixel sizes per spec
+    BG0, BG1 = (10, 16, 32), (5, 8, 15)          # navy center -> near-black corners
+    FG, MUTED, ACCENT = "#e2e6ee", "#8b93a3", "#4f9dff"
+    NEON = [(79, 157, 255), (155, 89, 255), (0, 230, 190), (255, 170, 60)]  # blue/violet/teal/amber
+
+    def neon_bg():
+        """Navy radial gradient + blueprint grid + neon bloom blobs, blurred."""
+        import math
+        base = Image.new("RGB", (W, 1800))
+        px = base.load()
+        cx, cy, maxd = W / 2, 900, math.hypot(W / 2, 900)
+        for yy in range(1800):
+            for xx in range(0, W, 2):
+                d = math.hypot(xx - cx, yy - cy) / maxd
+                t = max(0.0, 1 - d) ** 1.6
+                r = int(BG1[0] + (BG0[0] - BG1[0]) * t)
+                g = int(BG1[1] + (BG0[1] - BG1[1]) * t)
+                b = int(BG1[2] + (BG0[2] - BG1[2]) * t)
+                px[xx, yy] = (r, g, b)
+                if xx + 1 < W:
+                    px[xx + 1, yy] = (r, g, b)
+        # faint blueprint grid
+        gline = ImageDraw.Draw(base, "RGBA")
+        step = 52
+        for gx in range(0, W, step):
+            gline.line([(gx, 0), (gx, 1800)], fill=(90, 140, 220, 14), width=1)
+        for gy in range(0, 1800, step):
+            gline.line([(0, gy), (W, gy)], fill=(90, 140, 220, 14), width=1)
+        # neon bloom: soft colored blobs
+        glow = Image.new("RGB", (W, 1800), (0, 0, 0))
+        gd = ImageDraw.Draw(glow)
+        blobs = [(0.12, 0.10, 90), (0.90, 0.28, 70), (0.15, 0.62, 80),
+                 (0.88, 0.80, 75), (0.50, 0.95, 60)]
+        for (fx, fy, rad), col in zip(blobs, NEON):
+            gd.ellipse([W*fx - rad, 1800*fy - rad, W*fx + rad, 1800*fy + rad], fill=col)
+        glow = glow.filter(ImageFilter.GaussianBlur(120))
+        from PIL import ImageChops
+        base = ImageChops.add(base, glow)
+        return base
+
+    img = neon_bg()
     draw = ImageDraw.Draw(img)
     y = PAD
 
@@ -419,11 +458,11 @@ def model_card_png(model_id: int):
                 y += 30
             y += 4
 
-    # QR code, top-right
+    # QR code, top-right — SAME pixel size as v0.2.0 (260), same corner anchor
     qr = qrcode.QRCode(box_size=6, border=1)
     qr.add_data(url)
     qr.make(fit=True)
-    qimg = qr.make_image(fill_color=FG, back_color=BG).convert("RGB")
+    qimg = qr.make_image(fill_color="#ffffff", back_color="#0a1020").convert("RGB")
     QS = 260
     qimg = qimg.resize((QS, QS), Image.NEAREST)
     img.paste(qimg, (W - PAD - QS, PAD + 10))
