@@ -382,6 +382,15 @@ def model_card_png(model_id: int):
     draw = ImageDraw.Draw(img)
     y = PAD
 
+    def round_corners(im, radius=36):
+        """Apply rounded corners with transparency (rendered over the bg color)."""
+        from PIL import ImageDraw as ID
+        mask = Image.new("L", im.size, 0)
+        ID.Draw(mask).rounded_rectangle([0, 0, im.size[0] - 1, im.size[1] - 1], radius=radius, fill=255)
+        out = Image.new("RGBA", im.size, (0, 0, 0, 0))
+        out.paste(im, (0, 0), mask)
+        return out
+
     def font(size, bold=False):
         for p in ("/usr/share/fonts/truetype/dejavu/DejaVuSans%s.ttf" % ("-Bold" if bold else ""),
                   "/usr/share/fonts/TTF/DejaVuSans%s.ttf" % ("-Bold" if bold else "")):
@@ -491,6 +500,7 @@ def model_card_png(model_id: int):
     y += 30
 
     out = img.crop((0, 0, W, min(img.height, y)))
+    out = round_corners(out.convert("RGB"), radius=36)
     buf = io.BytesIO()
     out.save(buf, "PNG")
     return Response(content=buf.getvalue(), media_type="image/png")
