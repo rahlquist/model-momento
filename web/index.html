@@ -109,15 +109,15 @@ async function openModel(id) {
       <div class="row"><span class="k">link</span><span class="hf-line"><a href="${m.hf_url||'#'}" target="_blank">${m.hf_url||'—'}</a>
         <button class="copy-btn" title="Copy link" onclick="copyLink(this, '${(m.hf_url||'').replace(/'/g,"\\'")}')">&#128203;</button></span></div>
     </div>
-    ${(m.evals||[]).length ? `<div class="card"><h3>Claimed evals</h3>${m.evals.map(e=>`<div class="row"><span class="k">${e.benchmark_name}${e.variant?' ('+e.variant+')':''} [${e.source||''}]</span><span>${e.score??'—'}</span></div>`).join('')}</div>` : ''}
-    ${(m.runs||[]).length ? `<div class="card"><h3>My test runs</h3>${m.runs.map(r=>`<div class="row"><span class="k">${r.run_date?.slice(0,16)} · ${r.host||'?'} · ${r.backend||'?'}</span><span>${r.verdict||'—'}</span></div>`).join('')}</div>` : ''}
-    ${(m.note_list||[]).length ? `<div class="card"><h3>Notes</h3>${m.note_list.map(n=>`<div class="row"><span class="k">${n.note_date?.slice(0,16)} ${n.category?'· '+n.category:''}</span><span>${esc(n.note)}</span></div>`).join('')}</div>` : ''}
     <div class="card"><h3>Perfect for (VRAM)</h3>
       <div class="pf-grid">${VRAMS.map(v => {
         const on = m.perfect_for && m.perfect_for[v.key];
         return `<label class="pf ${on?'on':''}"><input type="checkbox" ${on?'checked':''} onchange="setPF(${m.model_id},'${v.key}',this.checked)"><span>${v.label}</span></label>`;
       }).join('')}</div>
     </div>
+    ${(m.evals||[]).length ? `<div class="card"><h3>Claimed evals</h3>${m.evals.map(e=>`<div class="row"><span class="k">${e.benchmark_name}${e.variant?' ('+e.variant+')':''} [${e.source||''}]</span><span>${e.score??'—'}</span></div>`).join('')}</div>` : ''}
+    ${(m.runs||[]).length ? `<div class="card"><h3>My test runs</h3>${m.runs.map(r=>`<div class="row"><span class="k">${r.run_date?.slice(0,16)} · ${r.host||'?'} · ${r.backend||'?'}</span><span>${r.verdict||'—'}</span></div>`).join('')}</div>` : ''}
+    ${(m.note_list||[]).length ? `<div class="card"><h3>Notes</h3>${m.note_list.map(n=>`<div class="row"><span class="k">${n.note_date?.slice(0,16)} ${n.category?'· '+n.category:''}</span><span>${esc(n.note)}</span></div>`).join('')}</div>` : ''}
     <div class="card"><h3>Add note</h3>
       <form onsubmit="addNote(event, ${m.model_id})">
         <label>Category<input name="category" placeholder="quality / refusal / bug / …"></label>
