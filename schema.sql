@@ -116,6 +116,24 @@ CREATE TABLE model_note (
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE perfect_for (
+    perfect_for_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    model_id       INTEGER NOT NULL UNIQUE REFERENCES model(model_id) ON DELETE CASCADE,
+    vram_256gb     INTEGER NOT NULL DEFAULT 0 CHECK (vram_256gb IN (0,1)),
+    vram_128gb     INTEGER NOT NULL DEFAULT 0 CHECK (vram_128gb IN (0,1)),
+    vram_64gb      INTEGER NOT NULL DEFAULT 0 CHECK (vram_64gb IN (0,1)),
+    vram_32gb      INTEGER NOT NULL DEFAULT 0 CHECK (vram_32gb IN (0,1)),
+    vram_22gb      INTEGER NOT NULL DEFAULT 0 CHECK (vram_22gb IN (0,1)),
+    vram_20gb      INTEGER NOT NULL DEFAULT 0 CHECK (vram_20gb IN (0,1)),
+    vram_16gb      INTEGER NOT NULL DEFAULT 0 CHECK (vram_16gb IN (0,1)),
+    vram_12gb      INTEGER NOT NULL DEFAULT 0 CHECK (vram_12gb IN (0,1)),
+    vram_8gb       INTEGER NOT NULL DEFAULT 0 CHECK (vram_8gb IN (0,1)),
+    vram_4gb       INTEGER NOT NULL DEFAULT 0 CHECK (vram_4gb IN (0,1)),
+    everything     INTEGER NOT NULL DEFAULT 0 CHECK (everything IN (0,1)),
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE INDEX idx_model_pipeline ON model(pipeline_tag);
 CREATE INDEX idx_model_license  ON model(license);
 CREATE INDEX idx_run_model      ON test_run(model_id);
@@ -142,3 +160,5 @@ CREATE TRIGGER trg_test_metric_updated AFTER UPDATE ON test_metric
 BEGIN UPDATE test_metric SET updated_at = CURRENT_TIMESTAMP WHERE rowid = NEW.rowid; END;
 CREATE TRIGGER trg_model_note_updated AFTER UPDATE ON model_note
 BEGIN UPDATE model_note SET updated_at = CURRENT_TIMESTAMP WHERE rowid = NEW.rowid; END;
+CREATE TRIGGER trg_perfect_for_updated AFTER UPDATE ON perfect_for
+BEGIN UPDATE perfect_for SET updated_at = CURRENT_TIMESTAMP WHERE rowid = NEW.rowid; END;

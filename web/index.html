@@ -44,6 +44,11 @@
               transition:transform .08s, background .15s; }
   .copy-btn:active { transform:scale(.88); background:#2f6fed; }
   .copy-btn.copied { background:#2f6fed; border-color:#2f6fed; }
+  .pf-grid { display:flex; flex-wrap:wrap; gap:8px; }
+  .pf { display:inline-flex; align-items:center; gap:5px; background:#161a22; border:1px solid #262c38;
+        border-radius:6px; padding:4px 9px; cursor:pointer; font-size:12px; color:#aeb6c4; }
+  .pf.on { border-color:#2f6fed; color:#fff; background:#1d2740; }
+  .pf input { accent-color:#2f6fed; margin:0; }
 </style>
 </head>
 <body>
@@ -107,6 +112,12 @@ async function openModel(id) {
     ${(m.evals||[]).length ? `<div class="card"><h3>Claimed evals</h3>${m.evals.map(e=>`<div class="row"><span class="k">${e.benchmark_name}${e.variant?' ('+e.variant+')':''} [${e.source||''}]</span><span>${e.score??'—'}</span></div>`).join('')}</div>` : ''}
     ${(m.runs||[]).length ? `<div class="card"><h3>My test runs</h3>${m.runs.map(r=>`<div class="row"><span class="k">${r.run_date?.slice(0,16)} · ${r.host||'?'} · ${r.backend||'?'}</span><span>${r.verdict||'—'}</span></div>`).join('')}</div>` : ''}
     ${(m.note_list||[]).length ? `<div class="card"><h3>Notes</h3>${m.note_list.map(n=>`<div class="row"><span class="k">${n.note_date?.slice(0,16)} ${n.category?'· '+n.category:''}</span><span>${esc(n.note)}</span></div>`).join('')}</div>` : ''}
+    <div class="card"><h3>Perfect for (VRAM)</h3>
+      <div class="pf-grid">${VRAMS.map(v => {
+        const on = m.perfect_for && m.perfect_for[v.key];
+        return `<label class="pf ${on?'on':''}"><input type="checkbox" ${on?'checked':''} onchange="setPF(${m.model_id},'${v.key}',this.checked)"><span>${v.label}</span></label>`;
+      }).join('')}</div>
+    </div>
     <div class="card"><h3>Add note</h3>
       <form onsubmit="addNote(event, ${m.model_id})">
         <label>Category<input name="category" placeholder="quality / refusal / bug / …"></label>
@@ -128,6 +139,16 @@ async function openModel(id) {
       </form></div>`;
 }
 const esc = s => (s||'').replace(/</g,'&lt;');
+const VRAMS = [["vram_256gb","256GB"],["vram_128gb","128GB"],["vram_64gb","64GB"],["vram_32gb","32GB"],["vram_22gb","22GB"],["vram_20gb","20GB"],["vram_16gb","16GB"],["vram_12gb","12GB"],["vram_8gb","8GB"],["vram_4gb","4GB"],["everything","Everything"]];
+
+async function setPF(mid, key, val) {
+  const cur = await api('/api/models/' + mid + '/perfect_for') || {};
+  const body = {};
+  VRAMS.forEach(([k]) => body[k] = k === key ? val : !!cur[k]);
+  const r = await api('/api/models/' + mid + '/perfect_for', {method:'PUT', body: JSON.stringify(body)});
+  if (!r.ok) alert('Save failed');
+  else openModel(mid);
+}
 
 async function copyLink(btn, url) {
   try { await navigator.clipboard.writeText(url); }

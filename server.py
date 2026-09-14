@@ -88,6 +88,8 @@ def get_model(model_id: int):
     out["evals"] = rows(c, "SELECT benchmark_name, score, variant, source FROM model_eval WHERE model_id=?", (model_id,))
     out["note_list"] = rows(c, "SELECT note_id, note_date, author, category, note FROM model_note WHERE model_id=? ORDER BY note_date DESC", (model_id,))
     out["runs"] = rows(c, "SELECT run_id, run_date, host, backend, verdict, summary FROM test_run WHERE model_id=? ORDER BY run_date DESC", (model_id,))
+    pf = c.execute("SELECT * FROM perfect_for WHERE model_id=?", (model_id,)).fetchone()
+    out["perfect_for"] = dict(pf) if pf else None
     c.close()
     return out
 
@@ -480,6 +482,53 @@ def model_card_png(model_id: int):
     buf = io.BytesIO()
     out.save(buf, "PNG")
     return Response(content=buf.getvalue(), media_type="image/png")
+
+
+# ---------- perfect_for ----------
+
+VRAM_FIELDS = ["vram_256gb","vram_128gb","vram_64gb","vram_32gb","vram_22gb",
+               "vram_20gb","vram_16gb","vram_12gb","vram_8gb","vram_4gb","everything"]
+
+
+class PerfectForIn(BaseModel):
+    vram_256gb: bool = False
+    vram_128gb: bool = False
+    vram_64gb: bool = False
+    vram_32gb: bool = False
+    vram_22gb: bool = False
+    vram_20gb: bool = False
+    vram_16gb: bool = False
+    vram_12gb: bool = False
+    vram_8gb: bool = False
+    vram_4gb: bool = False
+    everything: bool = False
+
+
+@app.get("/api/models/{model_id}/perfect_for")
+def get_perfect_for(model_id: int):
+    c = con()
+    r = c.execute("SELECT * FROM perfect_for WHERE model_id=?", (model_id,)).fetchone()
+    c.close()
+    return dict(r) if r else None
+
+
+@app.put("/api/models/{model_id}/perfect_for")
+def set_perfect_for(model_id: int, p: PerfectForIn):
+    c = con()
+    if not c.execute("SELECT 1 FROM model WHERE model_id=?", (model_id,)).fetchone():
+        c.close()
+        raise HTTPException(404, "model not found")
+    vals = {f: int(getattr(p, f)) for f in VRAM_FIELDS}
+    cols = ",".join(vals)
+    qs = ",".join("?" for _ in vals)
+    with c:
+        c.execute(
+            f"INSERT INTO perfect_for (model_id, {cols}) VALUES (?, {qs}) "
+            f"ON CONFLICT(model_id) DO UPDATE SET {', '.join(f'{k}=excluded.{k}' for k in vals)}",
+            (model_id, *vals.values()),
+        )
+    c.close()
+    return {"ok": True, **vals}
 
 
 # ---------- SPA ----------
