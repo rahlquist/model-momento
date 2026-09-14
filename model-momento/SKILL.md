@@ -2,6 +2,7 @@
 name: model-momento
 description: 'Use when the user says memento followed by a Hugging Face link: import the model and open the notes UI.'
 license: MIT
+version: 0.2.0
 ---
 
 # model-momento Skill

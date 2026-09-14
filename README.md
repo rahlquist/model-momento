@@ -3,6 +3,8 @@
 SQLite-backed database of model info: HF metadata, benchmark runs, notes.
 FastAPI backend, single-file web UI, installable Hermes skill.
 
+**Version:** 0.2.0
+
 **Requirements:** Python 3.10+ (developed on 3.12). No Node build step.
 
 Includes an installable Hermes skill (`model-momento/SKILL.md`) — say
@@ -44,7 +46,7 @@ next session. Verify with `hermes skills list` or by asking the agent to run
 git clone https://github.com/rahlquist/model-momento
 cd model-momento
 python3 -m venv .venv
-.venv/bin/pip install fastapi 'uvicorn[standard]'
+.venv/bin/pip install -r requirements.txt
 .venv/bin/python -c "import sqlite3; c=sqlite3.connect('model_momento.db'); c.executescript(open('schema.sql').read())"
 .venv/bin/python server.py        # binds 0.0.0.0:8765
 ```
