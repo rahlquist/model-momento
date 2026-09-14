@@ -97,6 +97,7 @@ Base URL: `http://127.0.0.1:8765`
 | POST | `/api/evals` | Claimed score: `{model_id, benchmark_name, score, variant?, source?}` |
 | GET | `/api/search?q=` | Cross-table search (models, notes, runs, evals) |
 | GET | `/api/models/{id}/card.png` | Rendered PNG card with QR to the HF page |
+| GET/PUT | `/api/models/{id}/perfect_for` | Per-model VRAM fit booleans (256/128/64/32/22/20/16/12/8/4 GB + everything) |
 | POST | `/api/import` | `{repo_ids: ["owner/name", ...]}` from HF |
 
 `POST /api/runs` body: `{model_id, host?, backend?, prompt_template?,
